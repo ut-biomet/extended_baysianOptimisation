@@ -19,6 +19,7 @@
 #' @param newIndCost
 #' @param trait
 #' @param phenotyper
+#' @param genoChipSNP
 #' @param createModel
 #' @param selectMateInds
 #' @param aggrFun
@@ -38,6 +39,7 @@ breedSimOpt <- function(i,
                         newIndCost,
                         trait,
                         phenotyper,
+                        genoChipSNP,
                         createModel,
                         selectMateInds,
                         aggrFun,
@@ -72,9 +74,10 @@ breedSimOpt <- function(i,
                                initPop = initPop,
                                trait = trait,
                                phenotyper = phenotyper,
+                               genoChipSNP = genoChipSNP,
                                createModel = createModel,
                                selectMateInds = selectMateInds,
-                               verbose = FALSE)
+                               verbose = verbose)
 
     results <- aggrFun(finalGVs)
     names(results) <- paste0('BV_', aggrFunName)
@@ -106,6 +109,7 @@ simuleBreeding <- function(nPheno,
                            initPop,
                            trait,
                            phenotyper,
+                           genoChipSNP,
                            createModel,
                            selectMateInds,
                            verbose = TRUE) {
@@ -132,7 +136,7 @@ simuleBreeding <- function(nPheno,
   # simulation initialization ----
   currentPop <- initPop
   phenoDta <- data.frame()
-  genoData <- matrix(nrow = 0, ncol = ncol(currentPop$genoMat))
+  genoData <- matrix(nrow = 0, ncol = ncol(currentPop$genoMat[, genoChipSNP]))
 
   # start simulation algorithm ----
   for (gen in seq(nGen)) {
@@ -154,7 +158,7 @@ simuleBreeding <- function(nPheno,
       if (verbose) cat("\tModel calculation\n")
       newPhenoDta <- phenotyper$trial(currentPop, rep = rep)$data
       phenoDta <- rbind(phenoDta, newPhenoDta)
-      newGenoData <- currentPop$genoMat
+      newGenoData <- currentPop$genoMat[, genoChipSNP]
       genoData <- rbind(genoData, newGenoData)
       model <- createModel(phenoDta, genoData, trait$name)
     }

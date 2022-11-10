@@ -23,6 +23,11 @@
 #' the total budget will be calculated by:
 #' `totalBudget = nGen * plotCost * plotBudgetPerGen`
 #' @param nSNP total number of SNP
+#' @param genoChipSize number of SNP for genotyping
+#' @param genoChipNind number of individuals to subset for selecting the
+#' genotyped SNP
+#' @param genoChipMinMAF threshold on the minor allele frequency in the subset
+#' of individuals. Only SNP with MAF >= genoChipMinMAF will be selected (randomly).
 #' @param mu phenotypic mean (see: breedSimulatR::phenotyper)
 #' @param he heritability (see: breedSimulatR::phenotyper)
 #' @param ve environmental variance (see: breedSimulatR::phenotyper)
@@ -54,6 +59,9 @@ setupSimulation <- function(dataFile,
                             totalBudget = NULL,
                             plotBudjetPerGen = NULL,
                             nSNP = NULL,
+                            genoChipSize = 3000,
+                            genoChipNind = 20,
+                            genoChipMinMAF = 0.10,
                             mu = 0,
                             he = NULL,
                             ve = NULL,
@@ -110,6 +118,29 @@ setupSimulation <- function(dataFile,
                                verbose = verbose)
   remove(genoDta) # clear memory
 
+
+
+  # Select SNP for genotyping ----
+
+  genoChipPop <- BSR_Obj$initPop$clone()
+  # select a subset of individuals from the population
+  genoChipPop$remInds(indsNames = sample(names(genoChipPop$inds),
+                                         genoChipPop$nInd - genoChipNind))
+
+  # sample markers for which the MAF in the samples individuals is above
+  # specific threshold
+  maf <- genoChipPop$maf
+  genoChipSNP <- names(maf[maf >= genoChipMinMAF])
+
+  if (length(genoChipSNP) >= genoChipSize) {
+    genoChipSNP <- sample(genoChipSNP, genoChipSize)
+  } else {
+    stop("Couldn't sample SNP for genotyping.",
+         "Not enought markers after filtering on the MAF.")
+  }
+
+
+
   # Create fixed parameters list ----
 
   # calculate total budget
@@ -126,6 +157,7 @@ setupSimulation <- function(dataFile,
   fp$initPop        = BSR_Obj$initPop      # initial population
   fp$trait          = BSR_Obj$trait        # trait of interest
   fp$phenotyper     = BSR_Obj$phenotyper   # phenotyper
+  fp$genoChipSNP    = genoChipSNP
   fp$selectMateInds = selectMateInds
   fp$createModel    = createModel
   fp$aggrFun        = aggrFun
@@ -212,6 +244,7 @@ setupSimulation <- function(dataFile,
     if (verbose) {
       fileHash <- digest::digest(resF, file = TRUE)
       cat(paste("Setup file MD5 fingerprint:", fileHash, "\n"))
+      cat('File created:', resF, '\n')
     }
   }
 
@@ -327,8 +360,10 @@ createBreedSimObj <- function(genoDta,
   ## sample qtn
   qtnId <- sample(snps$SNPcoord$SNPid, nQTN)
 
+
   ## qtn effects
-  qtnEffects <- rexp(nQTN, 1) * sample(c(-1, 1), nQTN, replace = T)
+  varQtnEffects <- 6 / (2 * sum(initPop$af[qtnId] * (1 - initPop$af[qtnId])))
+  qtnEffects <- rexp(nQTN, sqrt(2/(varQtnEffects))) * sample(c(-1, 1), nQTN, replace = T)
 
   trait1 <- breedSimulatR::trait$new(name = traitName,
                                      qtn = qtnId,

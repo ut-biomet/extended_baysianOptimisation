@@ -1,0 +1,198 @@
+---
+title: "Create Simulation setup"
+output: github_document
+params:
+  nGen: 5
+  he: 0.7
+  plotBudjetPerGen: 600
+  outFolder: NULL
+  seed: 2022
+---
+
+```{r setup, include=FALSE}
+knitStartTime <- Sys.time()
+knitr::opts_chunk$set(echo = TRUE,
+                      # format
+                      tidy = FALSE, # format code with 'tidy_source()'
+                      tidy.opts = list(width.cutoff = 80),
+                      strip.white = TRUE #remove the white lines in the beginning or end of a source chunk
+)
+```
+
+# Generate simulation setups
+
+### Load libraries
+
+Loading the library and source the file containing a R function of the project.
+
+```{r packages}
+suppressPackageStartupMessages({
+  library(gaston)
+  library(digest)
+  library(mlrMBO)
+  library(parallelMap)
+  library(parallel)
+  library(dotenv)
+})
+```
+
+### Return compilation parameters:
+
+```{r}
+print(params)
+```
+
+
+## Generate simulation setups
+
+"Simulation setups" contains all the information about the breeders constraints (eg. the initial population, the budgets and costs, the breeding algorithm...). This helps to run different optimization with same breeding constraints.
+
+We will generate different setups for the optimization because we will apply our optimization on different set of constraints (ie. scenario).
+
+From a R point of view, it is a list with all the necessary information for running the simulation (eg. values of some parameters, R functions...)
+
+
+### List of all the parameters of the setup
+
+- `nGen`: number of generation of the breeding campaign.
+- `plotBudjetPerGen`: budget of the breeding campaign in terms of "number of plot for one generation.
+- `he`: heritability of the phenotypic trait
+- `dataFile`: the genetic data of our initial population
+- `lchrCm` : the length of the chromosomes
+- `nQTN` : number of QTN (ie. markers with effects) to keep for the simulation
+- `nSNP` : the number of marker to keep for the simulation
+- `mu` : phenotypic mean
+- `ve` : NULL environmental variance (not necessary because we will specify the heritability of the initial population)
+- `plotCost`: cost for phenotyping one plot
+- `newIndCost` : cost for generating one new individual
+- `selectMateInds`: Function used by `breedSimOpt` which mate the selected individuals
+- `createModel`: Function used by `breedSimOpt` which create the prediction model (predict the genetic values of individual from their genotypes)
+- `breedSimOpt`: Function which simulate the breeding. **This is our objective function**.
+- `aggrFun`: Function which will be called by `breedSimOpt` to aggregate the genetic values of the final population.
+- `aggrFunName`: Name of the above function
+- `specName`: Specie's name
+- `popName`: Initial population name
+- `traitName`: Name of the phenotypic trait of interest
+- `seed`: Random seed used by the function generating the simulation setup to sample the genetic markers and markers effects used in the simulation.
+- `verbose`: Should the function generating the setup be be verbose.
+
+
+### Create simulations setups
+
+The function `setupSimulation` creating the setups objects is defined in [./src/setupSimulation.R](./src/setupSimulation.R).
+
+```{r load-SimSetup-function}
+# load the `setupSimulation` function
+source('src/setupSimulation.R')
+```
+
+#### Get the parameters
+
+```{r varSetup-1}
+# here, we load the simulations functions
+# those files are sourced in new child environments of the global one so that
+# the functions of interest will contain those environments and the dependencies
+# of the main function will be retreived
+# For example the function `breedSimOpt` which call the function
+# `getSimulParams` can be executed because it contain an environment where
+# `getSimulParams` is defined.
+
+selMate_env <- new.env(parent = globalenv())
+source('src/selectMatFun.R', local = selMate_env)
+
+genoPred_env <- new.env(parent = globalenv())
+source('src/genoPred.R', local = genoPred_env)
+
+sim_env <- new.env(parent = globalenv())
+source('src/simulation.R', local = sim_env)
+```
+
+```{r varSetup-2}
+setupParams <- list(
+  nGen = params$nGen,
+  he = params$he,
+  plotBudjetPerGen = params$plotBudjetPerGen,
+  seed = params$seed,
+  dataFile = 'data/fullData.vcf',
+  lchrCm = 100,
+  nQTN = 34000,
+  nSNP = 35000,
+  genoChipSize = 3333,
+  genoChipNind = 20,
+  genoChipMinMAF = 0.10,
+  mu = 0,
+  ve = NULL,
+  plotCost = 1,
+  newIndCost = 1,
+  selectMateInds = selMate_env$selectMate,
+  createModel = genoPred_env$createModel,
+  breedSimOpt = sim_env$breedSimOpt,
+  aggrFun = mean,
+  aggrFunName = 'mean',
+  specName = "bayesOpt",
+  popName = "initialPop",
+  traitName = "trait1",
+  verbose = TRUE
+)
+
+simSetupName <- digest(setupParams)
+outFolder = ifelse(is.null(params$outFolder), "simSetup", params$outFolder)
+```
+
+
+
+
+```{r genSetup}
+setupStart <- Sys.time()
+simSetup <- setupSimulation(
+  nGen = setupParams$nGen, 
+  he = setupParams$he, 
+  plotBudjetPerGen = setupParams$plotBudjetPerGen, 
+  dataFile = setupParams$dataFile, 
+  lchrCm = setupParams$lchrCm, 
+  nSNP = setupParams$nSNP, 
+  nQTN = setupParams$nQTN, 
+  genoChipSize = setupParams$genoChipSize,
+  genoChipNind = setupParams$genoChipNind,
+  genoChipMinMAF = setupParams$genoChipMinMAF,
+  plotCost = setupParams$plotCost, 
+  newIndCost = setupParams$newIndCost, 
+  selectMateInds = setupParams$selectMateInds, 
+  createModel = setupParams$createModel, 
+  breedSimOpt = setupParams$breedSimOpt, 
+  aggrFun = setupParams$aggrFun, 
+  aggrFunName = setupParams$aggrFunName, 
+  mu = setupParams$mu, 
+  ve = setupParams$ve, 
+  specName = setupParams$specName, 
+  popName = setupParams$popName, 
+  traitName = setupParams$traitName, 
+  replace = FALSE, 
+  setupName = simSetupName, 
+  seed = setupParams$seed, 
+  verbose = TRUE, 
+  outputFolder = outFolder,
+  varSetupParams = c('nGen', 'he', 'plotBudjetPerGen'))
+
+cat("Simulation setup done in:\n")
+print(Sys.time() - setupStart)
+```
+
+
+# Appendix {-}
+
+There is some information about the R session used to run the optimizations:
+
+```{r sessionInfo, echo=FALSE}
+options(max.print = 10000)
+cat("Document generated in:\n")
+print(Sys.time() - knitStartTime)
+if (Sys.info()["sysname"] == "Linux") {
+  cat("\nCPU: ")
+  cat(unique(system("awk -F': ' '/model name/{print $2}' /proc/cpuinfo", intern = T)))
+  cat("\nMemory total size: ")
+  cat(as.numeric(system("awk '/MemTotal/ {print $2}' /proc/meminfo", intern = T))*10^(-6), "GB")
+}
+cat("\n\n\nSession information:\n")
+print(sessionInfo(), locale = FALSE)
+```

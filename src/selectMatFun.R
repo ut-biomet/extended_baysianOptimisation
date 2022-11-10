@@ -18,7 +18,6 @@ selectMate <- function(pop,
                        nSel,
                        nNewTot,
                        basename) {
-
   ## selection ----
   selectedInds <- selectGS(pop = pop,
                            n = nSel,
@@ -72,8 +71,6 @@ matInds <- function(pop,
                     qtnEff) {
 
 
-  stopifnot(length(qtnEff) == ncol(pop$genoMat[selected,]))
-
   # fast return
   if (length(selected) == 1) {
     crossTable <- data.frame(ind1 = selected,
@@ -95,7 +92,7 @@ matInds <- function(pop,
     nMat <- 3
   } else {
     # weighted distances between individuals
-    dw <- dist(pop$genoMat[selected,]  %*% diag(qtnEff))
+    dw <- dist(pop$genoMat[selected, names(qtnEff)]  %*% diag(qtnEff))
 
     # find "longest" path
     tsp <- TSP::as.TSP(1/(dw + 10^-3)) # avoid 0 as denominator
@@ -103,9 +100,9 @@ matInds <- function(pop,
     min_length <- TSP::tour_length(best_tour)
     for (i in 1:10) {
       # tour <- TSP::solve_TSP(tsp, method = "nn")
-      tour <- TSP::solve_TSP(tsp, method = "two_opt",
+      invisible(capture.output(tour <- TSP::solve_TSP(tsp, method = "two_opt",
                              # tour = tour,
-                             two_opt_repetitions = 1000)
+                             two_opt_repetitions = 1000)))
       if (TSP::tour_length(tour) < min_length) {
         # if the obtained length is the shorter than the current best
         min_length <- TSP::tour_length(tour) # update the shortest path
