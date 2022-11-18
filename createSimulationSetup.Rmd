@@ -109,34 +109,13 @@ source('src/simulation.R', local = sim_env)
 
 ```{r varSetup-2}
 setupParams <- list(
-  nGen = params$nGen,
-  he = params$he,
-  plotBudjetPerGen = params$plotBudjetPerGen,
-  seed = params$seed,
-  dataFile = 'data/fullData.vcf',
-  lchrCm = 100,
-  nQTN = 34000,
-  nSNP = 35000,
-  genoChipSize = 3333,
-  genoChipNind = 20,
-  genoChipMinMAF = 0.10,
-  mu = 0,
-  ve = NULL,
-  plotCost = 1,
-  newIndCost = 1,
-  selectMateInds = selMate_env$selectMate,
-  createModel = genoPred_env$createModel,
-  breedSimOpt = sim_env$breedSimOpt,
-  aggrFun = mean,
-  aggrFunName = 'mean',
-  specName = "bayesOpt",
-  popName = "initialPop",
-  traitName = "trait1",
-  verbose = TRUE
 )
 
 simSetupName <- digest(setupParams)
 outFolder = ifelse(is.null(params$outFolder), "simSetup", params$outFolder)
+if (!dir.exists(outFolder)) {
+  dir.create(outFolder, recursive = TRUE)
+}
 ```
 
 
@@ -145,31 +124,31 @@ outFolder = ifelse(is.null(params$outFolder), "simSetup", params$outFolder)
 ```{r genSetup}
 setupStart <- Sys.time()
 simSetup <- setupSimulation(
-  nGen = setupParams$nGen, 
-  he = setupParams$he, 
-  plotBudjetPerGen = setupParams$plotBudjetPerGen, 
-  dataFile = setupParams$dataFile, 
-  lchrCm = setupParams$lchrCm, 
-  nSNP = setupParams$nSNP, 
-  nQTN = setupParams$nQTN, 
-  genoChipSize = setupParams$genoChipSize,
-  genoChipNind = setupParams$genoChipNind,
-  genoChipMinMAF = setupParams$genoChipMinMAF,
-  plotCost = setupParams$plotCost, 
-  newIndCost = setupParams$newIndCost, 
-  selectMateInds = setupParams$selectMateInds, 
-  createModel = setupParams$createModel, 
-  breedSimOpt = setupParams$breedSimOpt, 
-  aggrFun = setupParams$aggrFun, 
-  aggrFunName = setupParams$aggrFunName, 
-  mu = setupParams$mu, 
-  ve = setupParams$ve, 
-  specName = setupParams$specName, 
-  popName = setupParams$popName, 
-  traitName = setupParams$traitName, 
+  nGen = params$nGen,
+  he = params$he,
+  plotBudjetPerGen = params$plotBudjetPerGen,
+  dataFile = 'data/fullData.vcf',
+  lchrCm = 100,
+  nQTN = 7000,
+  nSNP = 15000,
+  genoChipSize = 3333,
+  genoChipNind = 20,
+  genoChipMinMAF = 0.10,
+  plotCost = 1,
+  newIndCost = 1,
+  selectMateInds = selMate_env$selectMate,
+  createModel = genoPred_env$createModel,
+  breedSimOpt = sim_env$breedSimOpt,
+  aggrFun = mean,
+  aggrFunName = 'mean',
+  mu = 0,
+  ve = NULL,
+  specName = "bayesOpt",
+  popName = "initialPop",
+  traitName = "trait1",
   replace = FALSE, 
-  setupName = simSetupName, 
-  seed = setupParams$seed, 
+  setupName = NULL, 
+  seed = params$seed,
   verbose = TRUE, 
   outputFolder = outFolder,
   varSetupParams = c('nGen', 'he', 'plotBudjetPerGen'))

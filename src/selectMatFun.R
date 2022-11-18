@@ -98,7 +98,7 @@ matInds <- function(pop,
     tsp <- TSP::as.TSP(1/(dw + 10^-3)) # avoid 0 as denominator
     best_tour <- TSP::TOUR(1:TSP::n_of_cities(tsp), tsp = tsp)
     min_length <- TSP::tour_length(best_tour)
-    for (i in 1:10) {
+    for (i in 1:1) {
       # tour <- TSP::solve_TSP(tsp, method = "nn")
       invisible(capture.output(tour <- TSP::solve_TSP(tsp, method = "two_opt",
                              # tour = tour,

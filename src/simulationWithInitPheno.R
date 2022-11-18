@@ -27,27 +27,28 @@
 #' @param verbose
 #'
 #' @return aggregated results of the breeding simulation
-breedSimOpt <- function(i,
-                        iHomo,
-                        bRep,
-                        phenoFreq,
-                        seed = NA,
-                        budget,
-                        nGen,
-                        initPop,
-                        plotCost,
-                        newIndCost,
-                        trait,
-                        phenotyper,
-                        genoChipSNP,
-                        createModel,
-                        selectMateInds,
-                        aggrFun,
-                        aggrFunName,
-                        verbose) {
-    if (!is.na(seed)) {
-      set.seed(seed)
-    }
+breedSimOpt2 <- function(i,
+                         iHomo,
+                         bRep,
+                         phenoFreq,
+                         seed = NA,
+                         budget,
+                         nGen,
+                         initPop,
+                         plotCost,
+                         newIndCost,
+                         trait,
+                         phenotyper,
+                         genoChipSNP,
+                         initPhenoData,
+                         createModel,
+                         selectMateInds,
+                         aggrFun,
+                         aggrFunName,
+                         verbose) {
+  if (!is.na(seed)) {
+    set.seed(seed)
+  }
 
   if (identical(Sys.getenv("BAYESOPT_TEST"), 'TRUE')) {
     results <- runif(1, -10000, -9999)
@@ -56,32 +57,34 @@ breedSimOpt <- function(i,
   }
 
   # get simulation parameters
-    newParams <- list(i = i,
-                      iHomo = iHomo,
-                      bRep = bRep,
-                      phenoFreq = phenoFreq,
-                      budget = budget,
-                      nGen = nGen,
-                      nIndIni = initPop$nInd,
-                      plotCost = plotCost,
-                      newIndCost = newIndCost)
-    params <- do.call(getSimulParams, newParams)
+  newParams <- list(i = i,
+                    iHomo = iHomo,
+                    bRep = bRep,
+                    phenoFreq = phenoFreq,
+                    budget = budget,
+                    nGen = nGen,
+                    nIndIni = initPop$nInd,
+                    plotCost = plotCost,
+                    newIndCost = newIndCost,
+                    nIniPheno = nrow(initPhenoData))
+  params <- do.call(getSimulParams2, newParams)
 
-    finalGVs <- simuleBreeding(nPheno = params$nPheno,
-                               nSelected = params$nSelected,
-                               nNew = params$nNew,
-                               nGen = nGen,
-                               initPop = initPop,
-                               trait = trait,
-                               phenotyper = phenotyper,
-                               genoChipSNP = genoChipSNP,
-                               createModel = createModel,
-                               selectMateInds = selectMateInds,
-                               verbose = verbose)
+  finalGVs <- simuleBreeding2(nPheno = params$nPheno,
+                             nSelected = params$nSelected,
+                             nNew = params$nNew,
+                             nGen = nGen,
+                             initPop = initPop,
+                             trait = trait,
+                             phenotyper = phenotyper,
+                             initPhenoData = initPhenoData,
+                             genoChipSNP = genoChipSNP,
+                             createModel = createModel,
+                             selectMateInds = selectMateInds,
+                             verbose = verbose)
 
-    results <- aggrFun(finalGVs)
-    names(results) <- paste0('BV_', aggrFunName)
-    results
+  results <- aggrFun(finalGVs)
+  names(results) <- paste0('BV_', aggrFunName)
+  results
 }
 
 
@@ -102,13 +105,14 @@ breedSimOpt <- function(i,
 #' @param matInds mating function
 #'
 #' @return GVs of the final population
-simuleBreeding <- function(nPheno,
+simuleBreeding2 <- function(nPheno,
                            nSelected,
                            nNew,
                            nGen,
                            initPop,
                            trait,
                            phenotyper,
+                           initPhenoData,
                            genoChipSNP,
                            createModel,
                            selectMateInds,
@@ -143,19 +147,23 @@ simuleBreeding <- function(nPheno,
 
     ## phenotyping ----
     if (nPheno[gen] != 0) {
-      rep <- nPheno[gen]/currentPop$nInd
-      if (floor(rep) != rep) {
-        if (verbose) {
-          message(paste("rep is not a multiple of nInds.",
-                      "Some individual will be phenotyped 1 plot more.",
-                      "(random selection)"))
+      if (gen != 1) {
+        rep <- nPheno[gen]/currentPop$nInd
+        if (floor(rep) != rep) {
+          if (verbose) {
+            message(paste("rep is not a multiple of nInds.",
+                          "Some individual will be phenotyped 1 plot more.",
+                          "(random selection)"))
+          }
+          nRep <- floor(rep)
+          rep <- base::rep(nRep, currentPop$nInd)
+          rep[sample(currentPop$nInd, nPheno[gen] - sum(rep))] <- nRep + 1
         }
-        nRep <- floor(rep)
-        rep <- base::rep(nRep, currentPop$nInd)
-        rep[sample(currentPop$nInd, nPheno[gen] - sum(rep))] <- nRep + 1
+        if (verbose) cat("\tModel calculation\n")
+        newPhenoDta <- phenotyper$trial(currentPop, rep = rep)$data
+      } else {
+        newPhenoDta <- initPhenoData
       }
-      if (verbose) cat("\tModel calculation\n")
-      newPhenoDta <- phenotyper$trial(currentPop, rep = rep)$data
       phenoDta <- rbind(phenoDta, newPhenoDta)
       newGenoData <- currentPop$genoMat[, genoChipSNP]
       if (currentPop$nInd == 1) {
@@ -209,15 +217,16 @@ simuleBreeding <- function(nPheno,
 #' @param newIndCost
 #'
 #' @return list of four elements: `nPheno`, `nSelected`, `nNew` (see documentation of `simuleBreeding` function), `eff.i`, `eff.budget` the effective budgets used for the breeding campaign.
-getSimulParams <- function(i,
-                           iHomo,
-                           bRep,
-                           phenoFreq,
-                           budget,
-                           nGen,
-                           nIndIni,
-                           plotCost = 1,
-                           newIndCost = 1.07){
+getSimulParams2 <- function(i,
+                            iHomo,
+                            bRep,
+                            phenoFreq,
+                            budget,
+                            nGen,
+                            nIniPheno,
+                            plotCost = 1,
+                            nIndIni,
+                            newIndCost = 1.07){
 
   # initialisation
   nSelected <- rep(0, nGen)
@@ -234,10 +243,12 @@ getSimulParams <- function(i,
 
 
   # 1 - calculation of the total number of new individuals and phenotyping plots
-  x <- calcNTotnPheno(bRep = bRep,
-                      budget = budget,
-                      plotCost = plotCost,
-                      newIndCost = newIndCost)
+  x <- calcNTotnPheno2(bRep = bRep,
+                       budget = budget,
+                       plotCost = plotCost,
+                       newIndCost = newIndCost,
+                       minPheno = nIniPheno,
+                       minInds = nGen)
 
   indTot <- x["indTot"]
   nPhenoTot <- x["nPheno"]
@@ -253,9 +264,10 @@ getSimulParams <- function(i,
   nSelected[2:nGen] <- nSel
 
   # 3 - calc number of phenotyping per generation
-  nPheno <- calcNpheno(phenoFreq = phenoFreq,
-                       nPhenoTot = nPhenoTot,
-                       nGen = nGen,)
+  nPheno <- calcNpheno2(phenoFreq = phenoFreq,
+                        nPhenoTot = nPhenoTot,
+                        nPheno1 = nIniPheno,
+                        nGen = nGen)
 
   # checks
   nInd <- c(nIndIni, nNew[1:nGen - 1])
@@ -295,8 +307,6 @@ getSimulParams <- function(i,
 calcNnew <- function(nTot, nGen, gen1 = NA, r = 0) {
 
   #checks:
-
-
   if (is.na(gen1)) {
     g <- seq(nGen)
     if (nTot < nGen) {
@@ -359,7 +369,28 @@ calcNnew <- function(nTot, nGen, gen1 = NA, r = 0) {
 #' @param newIndCost cost for creating one new individula.
 #'
 #' @return named vector containing: `indTot` and `nPheno` the total number of individulto create and the total number of phenotyping that can be done durring the breeding campaign and `remain` the remaining budget.
-calcNTotnPheno <- function(bRep, budget, plotCost = 1, newIndCost = 1.07){
+calcNTotnPheno2 <- function(bRep, budget, plotCost = 1, newIndCost = 1.07, minPheno = 3, minInds = 5){
+
+  # because we need a minimum amount of phenotyping, the budget repartion
+  # have a upper bound. If it is above, we reset its value to the maximum
+  # (to avoid error in the simulation)
+  maxBrep <- (budget - (minPheno * plotCost)) / budget
+  if (bRep > maxBrep) {
+    warning(paste("Budget repartition cannot be higher than", maxBrep, "\n",
+                  "Budget repartition have been lowered to this value."))
+    bRep <- maxBrep
+  }
+
+  # because we need a minimum amount of new individual, the budget repartion
+  # have a lower bound. If it is below, we reset its value to the minimum
+  # (to avoid error in the simulation)
+  minBrep <- (minInds * newIndCost) / budget
+  if (bRep < minBrep) {
+    warning(paste("Budget repartition cannot be lower than", minBrep, "\n",
+                  "Budget repartition have been increased to this value."))
+    bRep <- minBrep
+  }
+
   indB <- budget * bRep
   indTot <- max(round(indB / newIndCost), 1)
 
@@ -384,21 +415,40 @@ calcNTotnPheno <- function(bRep, budget, plotCost = 1, newIndCost = 1.07){
 
 
 #' Calculate the number of phenotyping to do at each generations from the total number of phenotyping and the "phenotyping frequency"
-calcNpheno <- function(phenoFreq,
-                       nPhenoTot,
-                       nGen,
-                       nInds = NA){
-
+calcNpheno2 <- function(phenoFreq,
+                        nPhenoTot,
+                        nGen,
+                        nPheno1,
+                        nInds = NA){
   phenoGen <- seq(1, nGen, phenoFreq)
   nPheno <- rep(0, nGen)
-  nPheno[phenoGen] <- floor(nPhenoTot / length(phenoGen))
+  nPheno[1] <- nPheno1
+  nPheno[phenoGen[-1]] <- floor((nPhenoTot - nPheno1) / (length(phenoGen)-1))
+
+  if (any(nPheno < 0)) {
+    warning(
+      # because of the behavior of calcNTotnPheno2 we should not arrive here...
+      paste("Not enought \"total phenotyping\" to phenotype the 1st generation.\n",
+            "We set the number of phenotyping for the 1st generation to \"nPhenoTot\"\n")
+    )
+    nPheno <- rep(0, nGen)
+    nPheno[1] <- nPhenoTot
+    return(nPheno)
+  }
 
   if (sum(nPheno) != nPhenoTot) {
     warning(paste("impossible to give the same number of nPheno for each campain.",
                   "random selection of some campain with more nPheno.\n"))
     remain <- nPhenoTot - sum(nPheno)
-    phenoGen <- sample(phenoGen, remain, replace = F)
-    nPheno[phenoGen] <- nPheno[phenoGen] + 1
+    if (length(phenoGen) != 1) {
+      phenoGen <- sample(phenoGen[-1], remain, replace = F)
+      nPheno[phenoGen] <- nPheno[phenoGen] + 1
+    } else {
+      warning(paste("Can't allocate the pheno budget because only the first",
+                    "generation is phenotyped and it's allocation is already",
+                    "set.\n",
+                    "remaining budget:", remain))
+    }
   }
 
   if (nPheno[1] < 3) {
@@ -410,3 +460,5 @@ calcNpheno <- function(phenoFreq,
 
   nPheno
 }
+
+

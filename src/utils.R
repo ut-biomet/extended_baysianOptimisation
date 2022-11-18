@@ -6,6 +6,76 @@
 
 
 
+
+writeVCF <- function(pop, file, keepSNP = NULL){
+
+      if (file.exists(file)) {
+        stop("`file` should not already exists.")
+      }
+      ext1 <- tools::file_ext(file)
+      ext2 <- tools::file_ext(tools::file_path_sans_ext(file))
+      if (ext1 != "gz" || ext2 != "vcf") {
+        message('your file extention is not ".vcf.gz"')
+      }
+
+      # Fixed region
+      data <- pop$inds[[1]]$haplo$SNPinfo$SNPcoord[, c("chr", "physPos", "SNPid")]
+      colnames(data) <- c("#CHROM", "POS", "ID")
+      data <- data[order(data$POS), ]
+      data <- data[order(data$`#CHROM`), ]
+
+      data$REF <- sample(c("A","C","T","G"), size = nrow(data), replace = TRUE)
+      data$ALT <- "."
+      data$QUAL <- "."
+      data$FILTER <- "PASS"
+      data$INFO <- "."
+
+      if (is.null(keepSNP)) {
+        keepSNP <- data$ID
+      } else {
+        data <- data[data$ID %in% keepSNP,]
+      }
+
+      # Genotype region
+      data$FORMAT <- "GT"
+      gt <- vapply(pop$inds, function(ind) {
+        hap <- do.call(cbind, ind$haplo$values)
+        hap <- hap[, keepSNP] # filter SNP
+        x <- paste(hap[1, ], hap[2, ], sep = "|")
+        names(x) <- colnames(hap)
+        x
+      }, vector(
+        mode = "character",
+        length = length(keepSNP)
+      ))
+      gt <- as.data.frame(gt[data$ID, ])
+      data <- cbind(data, gt)
+
+
+      # Meta region
+      meta <- paste("##fileformat=VCFv4.3",
+        "##source=\"breedSimulatR\", data in this file are simulated.",
+        "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
+        sep = "\n"
+      )
+
+      # write file
+      f <- gzfile(file, "w")
+      writeLines(text = meta, con = f)
+      close(f)
+      data.table::fwrite(
+        x = data,
+        file = file,
+        append = TRUE,
+        sep = "\t",
+        quote = FALSE,
+        row.names = FALSE,
+        col.names = TRUE
+      )
+}
+
+
+
 #' Try to send a notification to the user.
 #'
 #' It will first try to send a message using `slackr` using the default user's

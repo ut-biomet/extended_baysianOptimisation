@@ -1,6 +1,7 @@
 # project specific:
 *.vcf
-
+output/
+simSetup/
 
 # R specific:
 # History files

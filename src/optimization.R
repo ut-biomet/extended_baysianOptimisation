@@ -52,10 +52,10 @@
 #'
 #' @return
 bayesianOptimization <- function(
-  simSetup,
-  optP,
-  mainSeed = NULL,
-  outputFolder = 'results'){
+    simSetup,
+    optP,
+    mainSeed = NULL,
+    outputFolder = 'results'){
 
 
   startTime <- Sys.time()
@@ -173,7 +173,6 @@ bayesianOptimization <- function(
 
 
 
-
   # Bayesian optimization  ----
   parallelStartMulticore(cpus = optP$nCpusProposePoints,
                          show.info = TRUE,
@@ -186,6 +185,7 @@ bayesianOptimization <- function(
     show.info = TRUE
   )
   parallelStop()
+
 
   # Generated outputs ----
   results <- as.data.frame(run$opt.path)
@@ -201,7 +201,7 @@ bayesianOptimization <- function(
 
   # add fixed parameters to results
   for (i in names(simSetup$fixedParams)) {
-    if (is.numeric(simSetup$fixedParams[[i]]) | is.character(simSetup$fixedParams[[i]])) {
+    if ((is.numeric(simSetup$fixedParams[[i]]) | is.character(simSetup$fixedParams[[i]])) && length(simSetup$fixedParams[[i]]) == 1) {
       results <- cbind(simSetup$fixedParams[[i]], results)
       colnames(results)[1] <- i
     }
@@ -221,7 +221,7 @@ bayesianOptimization <- function(
   # if (length(run$models) != 0) {
   #   model <- run$models[[1]]$learner.model
   # } else if (length(run$final.opt.state$models) != 0) {
-    model <- run$final.opt.state$models$models[[1]]$learner.model
+  model <- run$final.opt.state$models$models[[1]]$learner.model
   # } else {
   #   model <- NULL
   #   warning("Couldn't retreive the latest Model.")
@@ -249,13 +249,15 @@ bayesianOptimization <- function(
                  startTime = startTime)
 
   # save results ----
-  i <- 1
-  resF <-  paste0(resultFile, '.rds')
-  while (file.exists(resF)) {
-    i <- i + 1
-    resF <- paste0(resultFile, '_', i, '.rds')
+  if (!is.null(outputFolder)) {
+    i <- 1
+    resF <-  paste0(resultFile, '.rds')
+    while (file.exists(resF)) {
+      i <- i + 1
+      resF <- paste0(resultFile, '_', i, '.rds')
+    }
+    saveRDS(output, file = resF)
   }
-  saveRDS(output, file = resF)
   output
 }
 
@@ -284,10 +286,10 @@ bayesianOptimization <- function(
 #'
 #' @return
 randomExploration <- function(
-  simSetup,
-  optP,
-  mainSeed = NULL,
-  outputFolder = 'results') {
+    simSetup,
+    optP,
+    mainSeed = NULL,
+    outputFolder = 'results') {
 
   startTime <- Sys.time()
 
@@ -401,9 +403,9 @@ randomExploration <- function(
     #                            mc.cores = nCpusProposePoints))
     # `parallelMap` seems to use less memory.
     res <- parallelMap(fun,
-                           split(sampledParams, seq(nrow(sampledParams))),
-                           simplify = TRUE,
-                           level = "custom.objective")
+                       split(sampledParams, seq(nrow(sampledParams))),
+                       simplify = TRUE,
+                       level = "custom.objective")
     res <- data.frame(sampledParams, res)
     colnames(res)[6] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
     res$dob <- c(rep(1:optP$totalIter, each = optP$propose.points))
@@ -424,9 +426,9 @@ randomExploration <- function(
       }
 
       iter_results <- parallelMap(fun,
-                             split(iter_params, seq(nrow(iter_params))),
-                             simplify = TRUE,
-                             level = "custom.objective")
+                                  split(iter_params, seq(nrow(iter_params))),
+                                  simplify = TRUE,
+                                  level = "custom.objective")
       iter_results <- data.frame(iter_params, iter_results)
       colnames(iter_results)[6] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
       iter_results$dob <- i

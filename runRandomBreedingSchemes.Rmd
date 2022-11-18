@@ -1,0 +1,233 @@
+---
+title: "Run random breeding schemes"
+output: github_document
+params:
+  nRepetition: 3
+  simSetupFile: 'simSetup/simSetup_8257d5b9f5db15da5156443270fa82b9.rds'
+  seed: 1993
+  outFolder: NULL
+---
+
+```{r setup, include=FALSE}
+knitStartTime <- Sys.time()
+knitr::opts_chunk$set(echo = TRUE,
+                      # format
+                      tidy = FALSE, # format code with 'tidy_source()'
+                      tidy.opts = list(width.cutoff = 80),
+                      strip.white = TRUE #remove the white lines in the beginning or end of a source chunk
+)
+```
+
+# Run random breeding schemes
+
+
+### Load libraries
+
+Loading the library and source the file containing a R function of the project.
+
+```{r packages}
+suppressPackageStartupMessages({
+  library(gaston)
+  library(TSP)
+  library(breedSimulatR)
+  library(digest)
+  library(glmnet)
+  library(mlrMBO)
+  library(parallelMap)
+  library(parallel)
+  library(lhs)
+  library(dotenv)
+})
+```
+
+### Return compilation parameters:
+
+```{r}
+print(params)
+outFolder = ifelse(is.null(params$outFolder), "randomSchemes", params$outFolder)
+if (!dir.exists(outFolder)) {
+  dir.create(outFolder, recursive = TRUE)
+}
+```
+
+
+
+## Simulate random breeding schemes
+
+Here we simulate some breeding scheme with random parameters.
+
+We use the "real" phenotyper (which use the "real" markers effects) to phenotype the individuals.
+
+
+```{r}
+nCPU <- detectCores()
+simSetup <- readRDS(params$simSetupFile)
+```
+
+
+```{r}
+source('src/simulation.R')
+```
+
+```{r}
+set.seed(params$seed)
+
+sampledParams <- sapply(simSetup$optParams$pars, function(param) {
+  if (param$type == "numeric") {
+    round(runif(params$nRepetition , param$lower, param$upper), digits = 4)
+  } else if (param$type == "integer") {
+    sample(param$lower:param$upper, params$nRepetition, replace = TRUE)
+  }
+})
+# draw list of seeds to be able to reproduce the results
+seed <- as.integer(sample.int(.Machine$integer.max, params$nRepetition))
+sampledParams <- cbind(sampledParams, seed)
+```
+
+
+
+```{r}
+# # example of one simulation:
+# x <- breedSimOpt(
+#   i = 0.1,
+#   iHomo = 0.3,
+#   bRep = 0.4,
+#   phenoFreq = 1,
+#   seed = 1993,
+#   budget = simSetup$fixedParams$budget,
+#   nGen = simSetup$fixedParams$nGen,
+#   initPop = simSetup$fixedParams$initPop,
+#   plotCost = simSetup$fixedParams$plotCost,
+#   newIndCost = simSetup$fixedParams$newIndCost,
+#   trait = simSetup$fixedParams$trait,
+#   phenotyper = simSetup$fixedParams$phenotyper,
+#   genoChipSNP = simSetup$fixedParams$genoChipSNP,
+#   createModel = simSetup$fixedParams$createModel,
+#   selectMateInds = simSetup$fixedParams$selectMateInds,
+#   aggrFun = simSetup$fixedParams$aggrFun,
+#   aggrFunName = simSetup$fixedParams$aggrFunName,
+#   verbose = TRUE
+# )
+```
+
+
+```{r}
+parallelStartMulticore(cpus = nCPU,
+                       show.info = TRUE,
+                       load.balancing = TRUE)
+parallelRegisterLevels(levels = "objective")
+missingSchemes <- sampledParams
+res <- NULL
+while (nrow(missingSchemes) != 0) {
+  resList <- parallelMap(function(x){
+    simStartTime <- Sys.time()
+    simRes <- breedSimOpt(
+      i = x[1],
+      iHomo = x[2],
+      bRep = x[3],
+      phenoFreq = x[4],
+      seed = x[5],
+      budget = simSetup$fixedParams$budget,
+      nGen = simSetup$fixedParams$nGen,
+      initPop = simSetup$fixedParams$initPop,
+      plotCost = simSetup$fixedParams$plotCost,
+      newIndCost = simSetup$fixedParams$newIndCost,
+      trait = simSetup$fixedParams$trait,
+      phenotyper = simSetup$fixedParams$phenotyper,
+      genoChipSNP = simSetup$fixedParams$genoChipSNP,
+      createModel = simSetup$fixedParams$createModel,
+      selectMateInds = simSetup$fixedParams$selectMateInds,
+      aggrFun = simSetup$fixedParams$aggrFun,
+      aggrFunName = simSetup$fixedParams$aggrFunName,
+      verbose = FALSE
+    )
+    
+    res <- data.frame(
+      i = x[1],
+      iHomo = x[2],
+      bRep = x[3],
+      phenoFreq = x[4],
+      seed = x[5],
+      BV = rnorm(1) )#simRes)
+    colnames(res)[6] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
+    
+    res$simulationTime <- as.numeric(Sys.time() - simStartTime, units = 'secs')
+    res$method <- 'random'
+    res$simSetupFile <- params$simSetupFile
+    res$nGen <- simSetup$fixedParams$nGen
+    res$he <- simSetup$setupInfo$he
+    res$plotBudjetPerGen <- simSetup$fixedParams$plotBudjetPerGen
+    
+    
+    
+    resultFile <- file.path(outFolder,
+                            paste0("randomScheme_", digest(res)))
+    resF <-  paste0(resultFile, '.csv')
+    i <- 1
+    while (file.exists(resF)) {
+      i <- i + 1
+      resF <- paste0(resultFile, '_', i, '.csv')
+    }
+    write.csv(res, file = resF, row.names = FALSE)
+    res
+  },
+  split(missingSchemes, seq(nrow(missingSchemes))),
+  simplify = FALSE,
+  level = "custom.objective")
+  
+  if (is.null(res)) {
+    res <- do.call(rbind, resList)
+  } else {
+    res <- rbind(res, do.call(rbind, resList))
+  }
+  
+  mergedDF <- rbind(res[, colnames(sampledParams)], sampledParams)
+  dup <- duplicated(mergedDF)[(nrow(res)+1):(nrow(res)+nrow(sampledParams))]
+  newMissingSchemes <- sampledParams[which(!dup),]
+  
+  if (isTRUE(all.equal(newMissingSchemes, missingSchemes))) {
+    warning("Fail to calculate some schemes:")
+    print(missingSchemes)
+    break
+  } else {
+    missingSchemes <- newMissingSchemes
+  }
+
+}
+parallelStop()
+```
+
+
+```{r}
+resultFile <- file.path(outFolder,
+                        paste0("aggregated-randomScheme_", digest(res)))
+resF <-  paste0(resultFile, '.csv')
+
+i <- 1
+while (file.exists(resF)) {
+  i <- i + 1
+  resF <- paste0(resultFile, '_', i, '.csv')
+}
+
+write.csv(res, file = resF, row.names = FALSE)
+```
+
+
+
+# Appendix {-}
+
+There is some information about the R session used to run the optimizations:
+
+```{r sessionInfo, echo=FALSE}
+  options(max.print = 10000)
+  cat("Document generated in:\n")
+  print(Sys.time() - knitStartTime)
+  if (Sys.info()["sysname"] == "Linux") {
+    cat("\nCPU: ")
+    cat(unique(system("awk -F': ' '/model name/{print $2}' /proc/cpuinfo", intern = T)))
+    cat("\nMemory total size: ")
+    cat(as.numeric(system("awk '/MemTotal/ {print $2}' /proc/meminfo", intern = T))*10^(-6), "GB")
+  }
+  cat("\n\n\nSession information:\n")
+  print(sessionInfo(), locale = FALSE)
+```

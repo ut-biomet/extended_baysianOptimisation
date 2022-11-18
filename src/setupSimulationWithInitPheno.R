@@ -47,37 +47,38 @@
 #'
 #' @return list of setup information: specie,snps,initPop = initPop,trait and
 #' phenotyper. (see: breedSimulatR's package documentation)
-setupSimulation <- function(dataFile=NULL,
-                            lchrCm,
-                            nQTN,
-                            nGen,
-                            plotCost,
-                            newIndCost,
-                            selectMateInds,
-                            createModel,
-                            breedSimOpt,
-                            aggrFun,
-                            aggrFunName,
-                            totalBudget = NULL,
-                            plotBudjetPerGen = NULL,
-                            nSNP = NULL,
-                            genoChipSize = NULL,
-                            genoChipNind = 20,
-                            genoChipMinMAF = 0.1,
-                            mu = 0,
-                            he = NULL,
-                            ve = NULL,
-                            specName = "bayesOpt",
-                            popName = "initialPop",
-                            traitName = "trait1",
-                            outputFolder = 'simSetups',
-                            replace = TRUE,
-                            setupName = "noName",
-                            varSetupParams = NULL,
-                            seed = NULL,
-                            genotypes = NULL,
-                            qtnEff = NULL,
-                            verbose = TRUE) {
+setupSimulation2 <- function(dataFile=NULL,
+                             lchrCm,
+                             nQTN,
+                             nGen,
+                             plotCost,
+                             newIndCost,
+                             selectMateInds,
+                             createModel,
+                             breedSimOpt,
+                             aggrFun,
+                             aggrFunName,
+                             totalBudget = NULL,
+                             plotBudjetPerGen = NULL,
+                             nSNP = NULL,
+                             genoChipSize = NULL,
+                             genoChipNind = 20,
+                             genoChipMinMAF = 0.1,
+                             initPhenoData,
+                             mu = 0,
+                             he = NULL,
+                             ve = NULL,
+                             specName = "bayesOpt",
+                             popName = "initialPop",
+                             traitName = "trait1",
+                             outputFolder = 'simSetups',
+                             replace = TRUE,
+                             setupName = "noName",
+                             varSetupParams = NULL,
+                             seed = NULL,
+                             genotypes = NULL,
+                             qtnEff = NULL,
+                             verbose = TRUE) {
 
   # test totalBudget and plotBudjetPerGen
   if ((is.null(totalBudget) && is.null(plotBudjetPerGen))
@@ -168,6 +169,7 @@ setupSimulation <- function(dataFile=NULL,
   fp$createModel    = createModel
   fp$aggrFun        = aggrFun
   fp$aggrFunName    = aggrFunName
+  fp$initPhenoData = initPhenoData
 
   initPopId        = paste0("initPop", "_", digest(BSR_Obj$initPop))
   traitId          = paste0("trait", "_", digest(BSR_Obj$trait))
@@ -177,6 +179,9 @@ setupSimulation <- function(dataFile=NULL,
   aggrFunNameId    = paste0(aggrFunName, "_", digest(aggrFun))
 
   # Create optimized parameters: ----
+  minInds <- 3
+  minBrep <- (minInds * fp$newIndCost) / fp$budget
+  maxBrep <- (fp$budget - (nrow(initPhenoData) * fp$plotCost)) / fp$budget
   optParams <- makeParamSet(
     makeNumericParam(id = "i",
                      lower = 0.01,
@@ -187,8 +192,8 @@ setupSimulation <- function(dataFile=NULL,
                      upper = 0.99,
                      default = 0.5),
     makeNumericParam(id = "bRep",
-                     lower = 0.01,
-                     upper = 0.99,
+                     lower = minBrep,
+                     upper = maxBrep,
                      default = 0.5),
     makeIntegerParam(id = "phenoFreq",
                      lower = 1,
@@ -440,6 +445,7 @@ createObjFun <- function(fixedParams,
                 trait = fixedParams$trait,
                 phenotyper = fixedParams$phenotyper,
                 genoChipSNP = fixedParams$genoChipSNP,
+                initPhenoData = fixedParams$initPhenoData,
                 createModel = fixedParams$createModel,
                 selectMateInds = fixedParams$selectMateInds,
                 aggrFun = fixedParams$aggrFun,
