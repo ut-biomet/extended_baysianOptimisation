@@ -4,7 +4,35 @@
 # Description:
 # utilities functions
 
+phaseWithBeagle <- function(geno,
+                            out,
+                            beaglePath,
+                            nthreads,
+                            ref = NULL,
+                            skipIfExists = F,
+                            pedigree = NULL){
 
+  stopifnot(file.exists(beaglePath))
+  cmd <- paste0('java -Xmx6g -jar ', beaglePath)
+
+  cmd <- paste0(cmd, ' gt=', geno, ' nthreads=', nthreads)
+  if (!is.null(ref)) {
+    cmd <- paste0(cmd, ' ref=', ref)
+  }
+
+  if (!is.null(pedigree)) {
+    cmd <- paste0(cmd, ' ped=', pedigree)
+  }
+
+  cmd <- paste0(cmd, ' out=', out)
+
+  outFile <- paste0(tools::file_path_sans_ext(tools::file_path_sans_ext(out)),
+                    '.vcf.gz')
+  if (!skipIfExists | !file.exists(outFile)) {
+    system(cmd)
+  }
+  outFile
+}
 
 
 writeVCF <- function(pop, file, keepSNP = NULL){
@@ -24,8 +52,9 @@ writeVCF <- function(pop, file, keepSNP = NULL){
       data <- data[order(data$POS), ]
       data <- data[order(data$`#CHROM`), ]
 
-      data$REF <- sample(c("A","C","T","G"), size = nrow(data), replace = TRUE)
-      data$ALT <- "."
+
+      data$REF <- "A" #sample(c("A","C","T","G"), size = nrow(data), replace = TRUE)
+      data$ALT <- "C"
       data$QUAL <- "."
       data$FILTER <- "PASS"
       data$INFO <- "."
@@ -41,7 +70,7 @@ writeVCF <- function(pop, file, keepSNP = NULL){
       gt <- vapply(pop$inds, function(ind) {
         hap <- do.call(cbind, ind$haplo$values)
         hap <- hap[, keepSNP] # filter SNP
-        x <- paste(hap[1, ], hap[2, ], sep = "|")
+        x <- paste(hap[1, ], hap[2, ], sep = "/")
         names(x) <- colnames(hap)
         x
       }, vector(

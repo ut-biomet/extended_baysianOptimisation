@@ -1,0 +1,462 @@
+---
+title: "Run random breeding schemes"
+output: github_document
+params:
+  nRepetition: 3
+  simSetupFile: 'simSetup/simSetup_8257d5b9f5db15da5156443270fa82b9.rds'
+  seed: 1993
+  proposedPoints: 4
+  nCpuBO: 4
+  totalIter: 2
+  BOdirectory: 'succesiveOptEffectsBO/boResults'
+  outFolder: 'succesiveOptEffectsBO'
+---
+
+```{r setup, include=FALSE}
+knitStartTime <- Sys.time()
+knitr::opts_chunk$set(echo = TRUE,
+                      # format
+                      tidy = FALSE, # format code with 'tidy_source()'
+                      tidy.opts = list(width.cutoff = 80),
+                      strip.white = TRUE #remove the white lines in the beginning or end of a source chunk
+)
+```
+
+# Run BO using estimated marker effects for the breeding simulations
+
+The breeder estimate the markers effects and use BO to 
+optimise the breeding scheme and use the optimised parameter for the entire 
+campaign.
+
+### Load libraries
+
+Loading the library and source the file containing a R function of the project.
+
+```{r packages}
+suppressPackageStartupMessages({
+  library(gaston)
+  library(TSP)
+  library(breedSimulatR)
+  library(digest)
+  library(glmnet)
+  library(mlrMBO)
+  library(parallelMap)
+  library(parallel)
+  library(lhs)
+  library(dotenv)
+})
+```
+
+### Return compilation parameters:
+
+```{r}
+print(params)
+outFolder <- params$outFolder
+if (!dir.exists(outFolder)) {
+  dir.create(outFolder, recursive = TRUE)
+}
+if (!dir.exists(params$BOdirectory)) {
+  dir.create(params$BOdirectory, recursive = TRUE)
+}
+```
+
+
+
+## Simulate simple BO breeding schemes
+
+
+```{r}
+totalCPU <- detectCores()
+nCPU <- floor(totalCPU / params$nCpuBO)
+simSetup <- readRDS(params$simSetupFile)
+```
+
+
+```{r}
+source('src/utils.R')
+sim_env <- new.env(parent = globalenv())
+source('src/simulationFromGen2.R', local = sim_env)
+source('src/simulationFromGen2.R')
+source('src/simulation.R')
+```
+
+
+## Optimisation setup
+
+"Optimization setups" contains all the information about the optimization parameters (eg. number of iterations, number of points evaluated parallely at each iterations, aquisition function (for bayesian otpimization) ... ). This helps to run the same on different breeding constraints.
+
+Only one optimization setup will be used.
+
+```{r optSetup}
+optP <- list(
+  kernel = 'gauss', # kernel of the gaussian process
+  final.method = 'best.predicted', # see mlrmbo documentation (`??makeMBOControl`) and below
+  acquFunction = makeMBOInfillCritEI(),
+  filter.proposed.points = TRUE, # should bayesian opt avoid sampling parameters too close to each-other
+  filter.proposed.points.tol = 0.001, # threshold defining if 2 points are too close to each-other
+  propose.points = params$proposedPoints, # number of points evaluated at each iteration
+  nCpusProposePoints = params$nCpuBO, # number of core to use for evaluating the points at each iteration
+  totalIter = params$totalIter, # total number of iteration
+  # time.budget = 60*30, # total time available for the optimization
+  initTrainSize = 5, # initial training data size
+  funEval = 1, # see below
+  nCpusFunEval = 1 # see below
+)
+```
+
+
+
+
+```{r}
+# # example of one simulation:
+# source('src/genoPred.R')
+# source('src/selectMatFun.R')
+# 
+# # simulation of the 1st generation:
+# remainBudget <- simSetup$fixedParams$budget
+# pheno <- simSetup$fixedParams$phenotyper$trial(simSetup$fixedParams$initPop, rep = 2)
+# remainBudget <- remainBudget - pheno$cost
+# genoData <- simSetup$fixedParams$initPop$genoMat[, simSetup$fixedParams$genoChipSNP]
+# model <- simSetup$fixedParams$createModel(pheno$data, genoData, simSetup$fixedParams$trait$name)
+# crosses <- selectMate(pop = simSetup$fixedParams$initPop,
+#                       model = model,
+#                       nSel = 30,
+#                       nNewTot = 100,
+#                       basename = "1stGen")
+# remainBudget <- remainBudget - (100 * simSetup$fixedParams$newIndCost)
+# newInd <- makeCrosses(crosses, simSetup$fixedParams$initPop)
+# firstGenPop <- breedSimulatR::population$new(name = "1stGen",
+#                                              inds = newInd,
+#                                              verbose = TRUE)
+# 
+# x <- breedSimOpt3(
+#   i = 0.1,
+#   bRep = 0.4,
+#   phenoFreq = 5,
+#   seed = 1993,
+#   budget = remainBudget,
+#   nGen = simSetup$fixedParams$nGen,
+#   currentSelectionCycle = 2,
+#   currentPop = firstGenPop,
+#   currentModel = model,
+#   genoDta = genoData,
+#   phenoDta = pheno$data,
+#   plotCost = simSetup$fixedParams$plotCost,
+#   newIndCost = simSetup$fixedParams$newIndCost,
+#   trait = simSetup$fixedParams$trait,
+#   phenotyper = simSetup$fixedParams$phenotyper,
+#   genoChipSNP = simSetup$fixedParams$genoChipSNP,
+#   createModel = simSetup$fixedParams$createModel,
+#   selectMateInds = simSetup$fixedParams$selectMateInds,
+#   aggrFun = simSetup$fixedParams$aggrFun,
+#   aggrFunName = simSetup$fixedParams$aggrFunName,
+#   verbose = TRUE
+# )
+```
+
+
+
+
+
+
+
+# create list of random seeds for the optimisation
+
+```{r}
+set.seed(params$seed)
+# draw list of seeds to be able to reproduce the results
+seeds <- as.integer(sample.int(.Machine$integer.max, params$nRepetition))
+```
+
+
+
+
+# run simulations
+
+
+```{r}
+source('src/setupSimulation.R')
+source('src/setupSumulationFromGen2.R')
+source('src/optimization.R')
+# create genetic data file of the initial population
+# with only the markers on the genotyping chip
+
+
+```
+
+
+```{r}
+
+res <- mcmapply(function(x){
+  
+  set.seed(x[1])
+  
+  # 1. we don't have any information about the marker effects, or heritability
+  # we use BO with random marker effects:
+  qtnId <- simSetup$fixedParams$genoChipSNP
+  qtnEff <- rnorm(length(qtnId), mean = 0, sd = sqrt(1/length(qtnId)))
+  names(qtnEff) <- qtnId
+  # heritability, we "underestimate" the heritability
+  estimHe <- simSetup$setupInfo$he - 0.1
+  # create the simulation setup for BO
+  vcfFile <- tempfile('boVcfFile-', fileext = '.vcf.gz')
+writeVCF(pop = simSetup$fixedParams$initPop,
+         file = vcfFile,
+         keepSNP = simSetup$fixedParams$genoChipSNP)
+  BOSimSetupInit <- setupSimulation(dataFile = vcfFile,
+                                    lchrCm = 100,
+                                    nGen = simSetup$fixedParams$nGen,
+                                    plotCost = simSetup$fixedParams$plotCost,
+                                    newIndCost = simSetup$fixedParams$newIndCost,
+                                    selectMateInds = simSetup$fixedParams$selectMateInds,
+                                    createModel = simSetup$fixedParams$createModel,
+                                    breedSimOpt = sim_env$breedSimOpt,
+                                    aggrFun = simSetup$fixedParams$aggrFun,
+                                    aggrFunName = simSetup$fixedParams$aggrFunName,
+                                    totalBudget = simSetup$fixedParams$budget,
+                                    mu = 9,
+                                    he = estimHe,
+                                    specName = "bayesOpt",
+                                    popName = "initialPop",
+                                    traitName = "trait1",
+                                    outputFolder = NULL,
+                                    setupName = "noName",
+                                    seed = NULL,
+                                    qtnEff = qtnEff,
+                                    nQTN = length(qtnEff),
+                                    verbose = FALSE)
+  
+  # run BO
+  BOseed <- sample.int(1000000, simSetup$fixedParams$nGen)
+  BOresults <- bayesianOptimization(
+    mainSeed = BOseed[1],
+    simSetup = BOSimSetupInit,
+    optP = optP,
+    outputFolder = file.path(params$BOdirectory, x[1]))
+  
+  opt_i <- c(BOresults$bestPoint$i, rep(NA, simSetup$fixedParams$nGen - 1))
+  opt_iHomo <- BOresults$bestPoint$iHomo
+  opt_bRep <- c(BOresults$bestPoint$bRep, rep(NA, simSetup$fixedParams$nGen - 1))
+  opt_phenoFreq <- c(BOresults$bestPoint$phenoFreq, rep(NA, simSetup$fixedParams$nGen - 1))
+
+  simuParams <- getSimulParams(i = BOresults$bestPoint$i,
+                 iHomo = BOresults$bestPoint$iHomo,
+                 bRep = BOresults$bestPoint$bRep,
+                 phenoFreq = BOresults$bestPoint$phenoFreq,
+                 budget = simSetup$fixedParams$budget,
+                 nGen = simSetup$fixedParams$nGen,
+                 nIndIni = simSetup$fixedParams$initPop$nInd,
+                 plotCost = simSetup$fixedParams$plotCost,
+                 newIndCost = simSetup$fixedParams$newIndCost)
+  
+  
+  
+  # 2. let's simulate all breeding cycles
+  currentPop <- simSetup$fixedParams$initPop$clone()
+  phenoDta <- data.frame()
+  genoData <- matrix(nrow = 0, ncol = ncol(currentPop$genoMat[, simSetup$fixedParams$genoChipSNP]))
+  remainBudget <- simSetup$fixedParams$budget
+  for (gen in seq(simSetup$fixedParams$nGen)) {
+    
+    # BO with the current information (only for gen 2 or above)
+    if (gen > 1) {
+      
+      vcfFile <- tempfile(paste0('boVcfFile-gen', gen-1, '-'), fileext = '.vcf.gz')
+      writeVCF(pop = currentPop,
+               file = vcfFile,
+               keepSNP = simSetup$fixedParams$genoChipSNP)
+      vcfFileBaseName <- tools::file_path_sans_ext(
+        tools::file_path_sans_ext(
+          basename(vcfFile)
+        )
+      )
+      # phase genotypes data
+      phasedVcfFile <- phaseWithBeagle(geno = vcfFile,
+                                       out = paste0(dirname(vcfFile),'/',
+                                                    vcfFileBaseName, "-pahsed"),
+                                       beaglePath = 'beagle/beagle.22Jul22.46e.jar',
+                                       nthreads = params$nCpuBO)
+      # he estimation
+      estimHe <- var(genoData %*% matrix(model$qtnEff, ncol = 1)) / var(phenoDta$trait1)
+      
+      BOSimSetup <- setupSimulation3(dataFile = phasedVcfFile,
+                                     lchrCm = 100,
+                                     nGen = simSetup$fixedParams$nGen,
+                                     plotCost = simSetup$fixedParams$plotCost,
+                                     newIndCost = simSetup$fixedParams$newIndCost,
+                                     selectMateInds = simSetup$fixedParams$selectMateInds,
+                                     createModel = simSetup$fixedParams$createModel,
+                                     breedSimOpt = sim_env$breedSimOpt3,
+                                     aggrFun = simSetup$fixedParams$aggrFun,
+                                     aggrFunName = simSetup$fixedParams$aggrFunName,
+                                     totalBudget = simSetup$fixedParams$budget,
+                                     currentSelectionCycle = gen,
+                                     currentModel = model,
+                                     genoDta = genoData,
+                                     phenoDta = phenoDta,
+                                     currentPop = currentPop,
+                                     mu = model$inter,
+                                     he = estimHe, 
+                                     specName = "bayesOpt",
+                                     popName = "initialPop",
+                                     traitName = "trait1",
+                                     outputFolder = NULL,
+                                     setupName = "noName",
+                                     seed = NULL,
+                                     qtnEff = model$qtnEff,
+                                     nQTN = length(model$qtnEff),
+                                     verbose = FALSE)
+      
+      BOresults <- bayesianOptimization(
+        mainSeed = BOseed[gen],
+        simSetup = BOSimSetup,
+        optP = optP,
+        outputFolder = file.path(params$BOdirectory, x[1]))
+      
+      opt_i[gen] <- BOresults$bestPoint$i
+      opt_bRep[gen] <- BOresults$bestPoint$bRep
+      opt_phenoFreq[gen] <- BOresults$bestPoint$phenoFreq
+      
+      
+      simuParams <- getSimulParams3(i = BOresults$bestPoint$i,
+                                    bRep = BOresults$bestPoint$bRep,
+                                    phenoFreq = BOresults$bestPoint$phenoFreq,
+                                    budget = remainBudget,
+                                    nGen = simSetup$fixedParams$nGen,
+                                    currentSelectionCycle = gen,
+                                    nIndIni = currentPop$nInd,
+                                    plotCost = simSetup$fixedParams$plotCost,
+                                    newIndCost = simSetup$fixedParams$newIndCost)
+    }
+    
+    
+    
+    
+    
+    
+    # phenotyping
+    if (simuParams$nPheno[1] != 0) {
+      rep <- simuParams$nPheno[1]/currentPop$nInd
+      if (floor(rep) != rep) {
+        nRep <- floor(rep)
+        rep <- base::rep(nRep, currentPop$nInd)
+        rep[sample(currentPop$nInd, simuParams$nPheno[1] - sum(rep))] <- nRep + 1
+      }
+      newPheno <- simSetup$fixedParams$phenotyper$trial(currentPop, rep = rep)
+      newPhenoDta <- newPheno$data
+      remainBudget <- remainBudget - newPheno$cost
+      phenoDta <- rbind(phenoDta, newPhenoDta)
+      newGenoData <- currentPop$genoMat[, simSetup$fixedParams$genoChipSNP]
+      if (currentPop$nInd == 1) {
+        newGenoData <- matrix(newGenoData, nrow = 1)
+        rownames(newGenoData) <- names(currentPop$inds)
+        colnames(newGenoData) <- simSetup$fixedParams$genoChipSNP
+      }
+      genoData <- rbind(genoData, newGenoData)
+      model <- simSetup$fixedParams$createModel(phenoDta, genoData, simSetup$fixedParams$trait$name)
+    }
+    
+    
+    
+    # Selection
+    crosses <- simSetup$fixedParams$selectMateInds(pop = currentPop,
+                                                   model = model,
+                                                   nSel = simuParams$nSelected[1],
+                                                   nNewTot = simuParams$nNew[1],
+                                                   basename = paste0("gen", gen))
+    newInd <- makeCrosses(crosses, currentPop)
+    remainBudget <- remainBudget - (simuParams$nNew[1] * simSetup$fixedParams$newIndCost)
+    currentPop <- breedSimulatR::population$new(name = paste0("gen_", gen),
+                                                inds = newInd,
+                                                verbose = FALSE)
+
+  }
+  
+  lastPopGV <- simSetup$fixedParams$trait$gv(currentPop)
+  simRes <- simSetup$fixedParams$aggrFun(lastPopGV)
+  names(simRes) <-  paste0('BV_', simSetup$fixedParams$aggrFunName)
+  
+  
+  
+  
+  
+  
+  
+  ########## END of Simulation ######
+  
+  res <- data.frame(
+    i = paste0(opt_i, collapse = "/"),
+    iHomo = BOresults$bestPoint$iHomo,
+    bRep = paste0(opt_bRep, collapse = "/"),
+    phenoFreq = paste0(opt_phenoFreq, collapse = "/"),
+    remainBudget = remainBudget,
+    mainSeed = x[1], # main seed of the calculation
+    # BOseed = BOseed, # seed used for the BO
+    # simSeed = simSeed, # seed used for the breeding simulation
+    BV = simRes)
+  colnames(res)[7] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
+  
+  res$method <- 'BO-successiveOpt'
+  res$simSetupFile <- params$simSetupFile
+  res$nGen <- simSetup$fixedParams$nGen
+  res$he <- simSetup$setupInfo$he
+  res$plotBudjetPerGen <- simSetup$fixedParams$plotBudjetPerGen
+  
+
+  resultFile <- file.path(outFolder,
+                          paste0("succesiveOptBOScheme_",
+                                 digest(res),
+                                 "-", x[1]))
+  resF <-  paste0(resultFile, '.csv')
+  i <- 1
+  while (file.exists(resF)) {
+    i <- i + 1
+    resF <- paste0(resultFile, '_', i, '.csv')
+  }
+  write.csv(res, file = resF, row.names = FALSE)
+  
+  res
+},
+x = seeds,
+SIMPLIFY = FALSE,
+mc.cores = nCPU,
+mc.preschedule = FALSE)
+```
+
+
+```{r}
+res <- do.call(rbind, res)
+
+resultFile <- file.path(outFolder,
+                        paste0("aggregated-succesiveOptBOScheme_", digest(res)))
+resF <-  paste0(resultFile, '.csv')
+
+i <- 1
+while (file.exists(resF)) {
+  i <- i + 1
+  resF <- paste0(resultFile, '_', i, '.csv')
+}
+
+write.csv(res, file = resF, row.names = FALSE)
+
+```
+
+
+
+# Appendix {-}
+
+There is some information about the R session used to run the optimizations:
+
+```{r sessionInfo, echo=FALSE}
+  options(max.print = 10000)
+  cat("Document generated in:\n")
+  print(Sys.time() - knitStartTime)
+  if (Sys.info()["sysname"] == "Linux") {
+    cat("\nCPU: ")
+    cat(unique(system("awk -F': ' '/model name/{print $2}' /proc/cpuinfo", intern = T)))
+    cat("\nMemory total size: ")
+    cat(as.numeric(system("awk '/MemTotal/ {print $2}' /proc/meminfo", intern = T))*10^(-6), "GB")
+  }
+  cat("\n\n\nSession information:\n")
+  print(sessionInfo(), locale = FALSE)
+```

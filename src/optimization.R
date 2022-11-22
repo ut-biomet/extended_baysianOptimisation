@@ -250,6 +250,9 @@ bayesianOptimization <- function(
 
   # save results ----
   if (!is.null(outputFolder)) {
+    if (!file.exists(outputFolder)) {
+      dir.create(outputFolder, recursive = TRUE)
+    }
     i <- 1
     resF <-  paste0(resultFile, '.rds')
     while (file.exists(resF)) {

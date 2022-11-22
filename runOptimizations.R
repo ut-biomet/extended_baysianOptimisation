@@ -20,12 +20,14 @@ seed_randomSchemes <- 1877
 seed_BOrandomMarkers <- 1809
 seed_BOrealMarkers <- 1890
 seed_BOestimatedMarkers <- 1822
+seed_BOsuccessiveOpt <- 1920
 
 outFolder_simSetup <- file.path(mainOutputFolder, 'simSetup')
 outFolder_randomSchemes <- file.path(mainOutputFolder, 'randomSchemes')
 outFolder_BOrandomMarkers <- file.path(mainOutputFolder, 'BOrandomMarkers')
 outFolder_BOrealMarkers <- file.path(mainOutputFolder, 'BOrealMarkers')
 outFolder_BOestimatedMarkers <- file.path(mainOutputFolder, 'BOestimatedMarkers')
+outFolder_BOsuccessiveOpt <- file.path(mainOutputFolder, 'BOsuccessiveOpt')
 
 
 meanTimeSimu <- 20
@@ -77,49 +79,49 @@ tryCatch({
 #   message(err)
 #   return(1)
 # })
-
-
-
-
-
-# run BO random markers effects
-tryCatch({
-  rmarkdown::render('runBO-randomMarkerEffects.Rmd',
-                    params = list(
-                      nRepetition = nRepBO,
-                      totalIter =  totalIterBO,
-                      proposedPoints = propPointsBO,
-                      nCpuBO = nCpuBO,
-                      simSetupFile = setupFile,
-                      BOdirectory = file.path(outFolder_BOrandomMarkers, 'boResults'),
-                      outFolder = outFolder_BOrandomMarkers,
-                      seed = seed_BOrandomMarkers),
-                    output_dir = mainOutputFolder)
-}, error = function(err) {
-  message("Error detected for: runBO-randomMarkerEffects.Rmd. Here's the original error message:")
-  message(err)
-  return(1)
-})
-
-# run BO estimated markers effects
-tryCatch({
-  rmarkdown::render('runBO-estimatedMarkerEffects.Rmd',
-                    params = list(
-                      nRepetition = nRepBO,
-                      totalIter =  totalIterBO,
-                      proposedPoints = propPointsBO,
-                      nCpuBO = nCpuBO,
-                      simSetupFile = setupFile,
-                      BOdirectory = file.path(outFolder_BOestimatedMarkers, 'boResults'),
-                      outFolder = outFolder_BOestimatedMarkers,
-                      seed = seed_BOestimatedMarkers),
-                    output_dir = mainOutputFolder)
-}, error = function(err) {
-  message("Error detected for: runBO-estimatedMarkerEffects.Rmd. Here's the original error message:")
-  message(err)
-  return(1)
-})
-
+#
+#
+#
+#
+#
+# # run BO random markers effects
+# tryCatch({
+#   rmarkdown::render('runBO-randomMarkerEffects.Rmd',
+#                     params = list(
+#                       nRepetition = nRepBO,
+#                       totalIter =  totalIterBO,
+#                       proposedPoints = propPointsBO,
+#                       nCpuBO = nCpuBO,
+#                       simSetupFile = setupFile,
+#                       BOdirectory = file.path(outFolder_BOrandomMarkers, 'boResults'),
+#                       outFolder = outFolder_BOrandomMarkers,
+#                       seed = seed_BOrandomMarkers),
+#                     output_dir = mainOutputFolder)
+# }, error = function(err) {
+#   message("Error detected for: runBO-randomMarkerEffects.Rmd. Here's the original error message:")
+#   message(err)
+#   return(1)
+# })
+#
+# # run BO estimated markers effects
+# tryCatch({
+#   rmarkdown::render('runBO-estimatedMarkerEffects.Rmd',
+#                     params = list(
+#                       nRepetition = nRepBO,
+#                       totalIter =  totalIterBO,
+#                       proposedPoints = propPointsBO,
+#                       nCpuBO = nCpuBO,
+#                       simSetupFile = setupFile,
+#                       BOdirectory = file.path(outFolder_BOestimatedMarkers, 'boResults'),
+#                       outFolder = outFolder_BOestimatedMarkers,
+#                       seed = seed_BOestimatedMarkers),
+#                     output_dir = mainOutputFolder)
+# }, error = function(err) {
+#   message("Error detected for: runBO-estimatedMarkerEffects.Rmd. Here's the original error message:")
+#   message(err)
+#   return(1)
+# })
+#
 # # run BO real markers effects
 # tryCatch({
 #   rmarkdown::render('runBO-RealMarkerEffects.Rmd',
@@ -138,3 +140,22 @@ tryCatch({
 #   message(err)
 #   return(1)
 # })
+
+# run BO successive optimisations
+tryCatch({
+  rmarkdown::render('runBO-succesiveOpt.Rmd',
+                    params = list(
+                      nRepetition = nRepBO,
+                      totalIter =  totalIterBO,
+                      proposedPoints = propPointsBO,
+                      nCpuBO = nCpuBO,
+                      simSetupFile = setupFile,
+                      BOdirectory = file.path(outFolder_BOsuccessiveOpt, 'boResults'),
+                      outFolder = outFolder_BOsuccessiveOpt,
+                      seed = seed_BOsuccessiveOpt),
+                    output_dir = mainOutputFolder)
+}, error = function(err) {
+  message("Error detected for: runBO-succesiveOpt.Rmd. Here's the original error message:")
+  message(err)
+  return(1)
+})
