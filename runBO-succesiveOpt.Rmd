@@ -189,6 +189,7 @@ source('src/optimization.R')
 
 res <- mcmapply(function(x){
   
+  simStartTime <- Sys.time()
   set.seed(x[1])
   
   # 1. we don't have any information about the marker effects, or heritability
@@ -200,9 +201,9 @@ res <- mcmapply(function(x){
   estimHe <- simSetup$setupInfo$he - 0.1
   # create the simulation setup for BO
   vcfFile <- tempfile('boVcfFile-', fileext = '.vcf.gz')
-writeVCF(pop = simSetup$fixedParams$initPop,
-         file = vcfFile,
-         keepSNP = simSetup$fixedParams$genoChipSNP)
+  writeVCF(pop = simSetup$fixedParams$initPop,
+           file = vcfFile,
+           keepSNP = simSetup$fixedParams$genoChipSNP)
   BOSimSetupInit <- setupSimulation(dataFile = vcfFile,
                                     lchrCm = 100,
                                     nGen = simSetup$fixedParams$nGen,
@@ -396,6 +397,7 @@ writeVCF(pop = simSetup$fixedParams$initPop,
     BV = simRes)
   colnames(res)[7] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
   
+  res$simulationTime <- as.numeric(Sys.time() - simStartTime, units = 'secs')
   res$method <- 'BO-successiveOpt'
   res$simSetupFile <- params$simSetupFile
   res$nGen <- simSetup$fixedParams$nGen

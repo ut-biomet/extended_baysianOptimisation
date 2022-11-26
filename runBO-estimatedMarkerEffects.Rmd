@@ -167,6 +167,7 @@ writeVCF(pop = simSetup$fixedParams$initPop,
 
 res <- mcmapply(function(x){
   
+  simStartTime <- Sys.time()
   set.seed(x[1])
   
   # estimate marker effects:
@@ -250,6 +251,7 @@ res <- mcmapply(function(x){
     BV = simRes)
   colnames(res)[8] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
   
+  res$simulationTime <- as.numeric(Sys.time() - simStartTime, units = 'secs')
   res$method <- 'BO-estimatedEffects'
   res$simSetupFile <- params$simSetupFile
   res$nGen <- simSetup$fixedParams$nGen

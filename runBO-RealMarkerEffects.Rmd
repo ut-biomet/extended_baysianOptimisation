@@ -165,6 +165,7 @@ source('src/simulation.R', local = sim_env)
 
 res <- mcmapply(function(x){
   
+  simStartTime <- Sys.time()
   set.seed(x[1])
   
   # remove use all qtn for genotyping
@@ -215,6 +216,7 @@ res <- mcmapply(function(x){
     BV = simRes)
   colnames(res)[8] <- paste0("BV_", simSetup$fixedParams$aggrFunName)
   
+  res$simulationTime <- as.numeric(Sys.time() - simStartTime, units = 'secs')
   res$method <- 'BO-realEffects'
   res$simSetupFile <- params$simSetupFile
   res$nGen <- simSetup$fixedParams$nGen
