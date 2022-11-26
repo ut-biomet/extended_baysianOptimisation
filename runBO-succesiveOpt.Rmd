@@ -386,7 +386,7 @@ writeVCF(pop = simSetup$fixedParams$initPop,
   
   res <- data.frame(
     i = paste0(opt_i, collapse = "/"),
-    iHomo = BOresults$bestPoint$iHomo,
+    iHomo = opt_iHomo,
     bRep = paste0(opt_bRep, collapse = "/"),
     phenoFreq = paste0(opt_phenoFreq, collapse = "/"),
     remainBudget = remainBudget,
