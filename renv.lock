@@ -4,7 +4,7 @@
     "Repositories": [
       {
         "Name": "CRAN",
-        "URL": "https://cran.ism.ac.jp"
+        "URL": "https://cran.r-project.org"
       }
     ]
   },
