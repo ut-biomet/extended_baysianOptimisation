@@ -10,6 +10,7 @@ params:
   totalIter: 2
   BOdirectory: 'succesiveOptEffectsBO/boResults'
   outFolder: 'succesiveOptEffectsBO'
+  prevResFolder: NULL
 ---
 
 ```{r setup, include=FALSE}
@@ -168,6 +169,22 @@ set.seed(params$seed)
 seeds <- as.integer(sample.int(.Machine$integer.max, params$nRepetition))
 ```
 
+# get missing runs
+
+```{r}
+if (!is.null(params$prevResFolder)) {
+  resFolder <- 'output/scenario1/BOsuccessiveOpt'
+  resFiles <- list.files(resFolder, pattern = '.csv$')
+  computedSeed <- as.numeric(regmatches(resFiles,
+                                        regexpr("\\d*(?=.csv$)",
+                                                resFiles,
+                                                perl = TRUE)))
+  
+  missingSeeds <- seeds[which(!seeds %in% computedSeed)]
+  seeds <- missingSeeds
+}
+```
+
 
 
 
@@ -229,11 +246,25 @@ res <- mcmapply(function(x){
   
   # run BO
   BOseed <- sample.int(1000000, simSetup$fixedParams$nGen)
-  BOresults <- bayesianOptimization(
-    mainSeed = BOseed[1],
-    simSetup = BOSimSetupInit,
-    optP = optP,
-    outputFolder = file.path(params$BOdirectory, x[1]))
+  
+  boResFile <- file.path(
+    params$prevResFolder,
+    'boResults',
+    x[1],
+    paste0('boRes_noName__', BOseed[1], '.rds')
+  )
+  
+  if (file.exists(boResFile)) {
+    BOresults <- readRDS(boResFile)
+  } else {
+    BOresults <- bayesianOptimization(
+      mainSeed = BOseed[1],
+      simSetup = BOSimSetupInit,
+      optP = optP,
+      outputFolder = file.path(params$BOdirectory, x[1]))
+  }
+  
+  
   
   opt_i <- c(BOresults$bestPoint$i, rep(NA, simSetup$fixedParams$nGen - 1))
   opt_iHomo <- BOresults$bestPoint$iHomo
@@ -308,11 +339,22 @@ res <- mcmapply(function(x){
                                      nQTN = length(model$qtnEff),
                                      verbose = FALSE)
       
-      BOresults <- bayesianOptimization(
-        mainSeed = BOseed[gen],
-        simSetup = BOSimSetup,
-        optP = optP,
-        outputFolder = file.path(params$BOdirectory, x[1]))
+      boResFile <- file.path(
+        params$prevResFolder,
+        'boResults',
+        x[1],
+        paste0('boRes_noName__', BOseed[gen], '.rds')
+      )
+      
+      if (file.exists(boResFile)) {
+        BOresults <- readRDS(boResFile)
+      } else {
+        BOresults <- bayesianOptimization(
+          mainSeed = BOseed[gen],
+          simSetup = BOSimSetupInit,
+          optP = optP,
+          outputFolder = file.path(params$BOdirectory, x[1]))
+      }
       
       opt_i[gen] <- BOresults$bestPoint$i
       opt_bRep[gen] <- BOresults$bestPoint$bRep
@@ -357,16 +399,16 @@ res <- mcmapply(function(x){
       model <- simSetup$fixedParams$createModel(phenoDta, genoData, simSetup$fixedParams$trait$name)
     }
     
-    
-    
+
     # Selection
+    nNewTot <- max(simuParams$nNew[1], 2) # beagle need at least 2 individuals.
     crosses <- simSetup$fixedParams$selectMateInds(pop = currentPop,
                                                    model = model,
                                                    nSel = simuParams$nSelected[1],
-                                                   nNewTot = simuParams$nNew[1],
+                                                   nNewTot = nNewTot,
                                                    basename = paste0("gen", gen))
     newInd <- makeCrosses(crosses, currentPop)
-    remainBudget <- remainBudget - (simuParams$nNew[1] * simSetup$fixedParams$newIndCost)
+    remainBudget <- remainBudget - (nNewTot * simSetup$fixedParams$newIndCost)
     currentPop <- breedSimulatR::population$new(name = paste0("gen_", gen),
                                                 inds = newInd,
                                                 verbose = FALSE)
