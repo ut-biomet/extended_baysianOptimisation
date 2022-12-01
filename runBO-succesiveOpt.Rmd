@@ -2,9 +2,9 @@
 title: "Run random breeding schemes"
 output: github_document
 params:
-  nRepetition: 3
+  nRepetition: 160
   simSetupFile: 'simSetup/simSetup_8257d5b9f5db15da5156443270fa82b9.rds'
-  seed: 1993
+  seed: 1920
   proposedPoints: 4
   nCpuBO: 4
   totalIter: 2
@@ -45,6 +45,7 @@ suppressPackageStartupMessages({
   library(parallel)
   library(lhs)
   library(dotenv)
+  library(lme4)
 })
 ```
 
@@ -173,7 +174,7 @@ seeds <- as.integer(sample.int(.Machine$integer.max, params$nRepetition))
 
 ```{r}
 if (!is.null(params$prevResFolder)) {
-  resFolder <- 'output/scenario1/BOsuccessiveOpt'
+  resFolder <- params$prevResFolder
   resFiles <- list.files(resFolder, pattern = '.csv$')
   computedSeed <- as.numeric(regmatches(resFiles,
                                         regexpr("\\d*(?=.csv$)",
@@ -309,7 +310,11 @@ res <- mcmapply(function(x){
                                        beaglePath = 'beagle/beagle.22Jul22.46e.jar',
                                        nthreads = params$nCpuBO)
       # he estimation
-      estimHe <- var(genoData %*% matrix(model$qtnEff, ncol = 1)) / var(phenoDta$trait1)
+      estimHe <- var(genoData[phenoDta$ind, ] %*% matrix(model$qtnEff, ncol = 1)) / var(phenoDta$trait1)
+      # he estimation
+      mod <- lmer("trait1 ~ (1|ind)", data = phenoDta)
+      variances <- as.data.frame(VarCorr(mod))
+      estimEnvVar <- variances[2, 'vcov']
       
       BOSimSetup <- setupSimulation3(dataFile = phasedVcfFile,
                                      lchrCm = 100,
@@ -328,7 +333,7 @@ res <- mcmapply(function(x){
                                      phenoDta = phenoDta,
                                      currentPop = currentPop,
                                      mu = model$inter,
-                                     he = estimHe, 
+                                     ve = estimEnvVar,
                                      specName = "bayesOpt",
                                      popName = "initialPop",
                                      traitName = "trait1",
@@ -401,7 +406,11 @@ res <- mcmapply(function(x){
     
 
     # Selection
-    nNewTot <- max(simuParams$nNew[1], 2) # beagle need at least 2 individuals.
+    if (gen == simSetup$fixedParams$nGen) {
+      nNewTot <- simuParams$nNew[1]
+    } else {
+      nNewTot <- max(simuParams$nNew[1], 2) # beagle need at least 2 individuals.
+    }
     crosses <- simSetup$fixedParams$selectMateInds(pop = currentPop,
                                                    model = model,
                                                    nSel = simuParams$nSelected[1],

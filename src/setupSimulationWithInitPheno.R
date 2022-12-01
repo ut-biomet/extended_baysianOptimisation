@@ -108,17 +108,17 @@ setupSimulation2 <- function(dataFile=NULL,
 
 
   # Create breedSimulatR's objects ----
-  BSR_Obj <- createBreedSimObj(genoDta = genoDta,
-                               specName = specName,
-                               lchrCm = lchrCm,
-                               popName = popName,
-                               nQTN = nQTN,
-                               traitName = traitName,
-                               mu = mu,
-                               ve = ve,
-                               he = he,
-                               qtnEff = qtnEff,
-                               verbose = verbose)
+  BSR_Obj <- createBreedSimObj2(genoDta = genoDta,
+                                specName = specName,
+                                lchrCm = lchrCm,
+                                popName = popName,
+                                nQTN = nQTN,
+                                traitName = traitName,
+                                mu = mu,
+                                ve = ve,
+                                he = he,
+                                qtnEff = qtnEff,
+                                verbose = verbose)
   remove(genoDta) # clear memory
 
 
@@ -320,17 +320,17 @@ loadData <- function(dataFile , nSNP, verbose) {
 
 
 
-createBreedSimObj <- function(genoDta,
-                              specName,
-                              lchrCm,
-                              popName,
-                              nQTN = NULL,
-                              traitName,
-                              mu,
-                              ve,
-                              he,
-                              qtnEff = NULL,
-                              verbose) {
+createBreedSimObj2 <- function(genoDta,
+                               specName,
+                               lchrCm,
+                               popName,
+                               nQTN = NULL,
+                               traitName,
+                               mu,
+                               ve,
+                               he,
+                               qtnEff = NULL,
+                               verbose) {
 
 
   ## specie definition ---------------------
@@ -404,13 +404,23 @@ createBreedSimObj <- function(genoDta,
 
   ## phenotyper definition ----------------
   if (verbose) cat("\nCreate breedSimulatR's phenotyper object\n")
-  phenoLab <- breedSimulatR::phenotyper$new(name = "PhenoLab1",
-                                            traits = list(trait1),
-                                            plotCost = 1,
-                                            mu = mu,
-                                            ve = ve,
-                                            he = he,
-                                            pop = initPop)
+  if (!is.null(ve )) {
+    phenoLab <- breedSimulatR::phenotyper$new(name = "PhenoLab1",
+                                              traits = list(trait1),
+                                              plotCost = 1,
+                                              mu = mu,
+                                              ve = ve,
+                                              he = NULL,
+                                              pop = NULL)
+  } else {
+    phenoLab <- breedSimulatR::phenotyper$new(name = "PhenoLab1",
+                                              traits = list(trait1),
+                                              plotCost = 1,
+                                              mu = mu,
+                                              ve = ve,
+                                              he = he,
+                                              pop = initPop)
+  }
 
   ## output ----
  list(initPop = initPop,

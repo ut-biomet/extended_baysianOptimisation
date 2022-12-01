@@ -311,13 +311,23 @@ createBreedSimObj3 <- function(dataFile,
 
   ## phenotyper definition ----------------
   if (verbose) cat("\nCreate breedSimulatR's phenotyper object\n")
-  phenoLab <- breedSimulatR::phenotyper$new(name = "PhenoLab1",
-                                            traits = list(trait1),
-                                            plotCost = 1,
-                                            mu = mu,
-                                            ve = ve,
-                                            he = he,
-                                            pop = breeSimObj$pop)
+  if (!is.null(ve )) {
+    phenoLab <- breedSimulatR::phenotyper$new(name = "PhenoLab1",
+                                              traits = list(trait1),
+                                              plotCost = 1,
+                                              mu = mu,
+                                              ve = ve,
+                                              he = NULL,
+                                              pop = NULL)
+  } else {
+    phenoLab <- breedSimulatR::phenotyper$new(name = "PhenoLab1",
+                                              traits = list(trait1),
+                                              plotCost = 1,
+                                              mu = mu,
+                                              ve = ve,
+                                              he = he,
+                                              pop = breeSimObj$pop)
+  }
 
   ## output ----
  list(initPop = breeSimObj$pop,

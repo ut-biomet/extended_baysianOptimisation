@@ -44,6 +44,7 @@ suppressPackageStartupMessages({
   library(parallel)
   library(lhs)
   library(dotenv)
+  library(lme4)
 })
 ```
 
@@ -178,7 +179,10 @@ res <- mcmapply(function(x){
   model <- simSetup$fixedParams$createModel(pheno$data, genoData, simSetup$fixedParams$trait$name)
   
   # calculate heritability
-  estimHe <- var(genoData %*% matrix(model$qtnEff, ncol = 1)) / var(pheno$data$trait1)
+  # he estimation
+  mod <- lmer("trait1 ~ (1|ind)", data = pheno$data)
+  variances <- as.data.frame(VarCorr(mod))
+  estimEnvVar <- variances[2, 'vcov']
   
   # create the simulation setup for BO
   BOSimSetup <- setupSimulation2(dataFile = vcfFile,
@@ -194,7 +198,7 @@ res <- mcmapply(function(x){
                                 totalBudget = simSetup$fixedParams$budget,
                                 initPhenoData = pheno$data,
                                 mu = model$inter,
-                                he = estimHe, 
+                                ve = estimEnvVar,
                                 specName = "bayesOpt",
                                 popName = "initialPop",
                                 traitName = "trait1",
