@@ -310,11 +310,18 @@ res <- mcmapply(function(x){
                                        beaglePath = 'beagle/beagle.22Jul22.46e.jar',
                                        nthreads = params$nCpuBO)
       # he estimation
-      estimHe <- var(genoData[phenoDta$ind, ] %*% matrix(model$qtnEff, ncol = 1)) / var(phenoDta$trait1)
+      tryCatch({
       # he estimation
       mod <- lmer("trait1 ~ (1|ind)", data = phenoDta)
       variances <- as.data.frame(VarCorr(mod))
       estimEnvVar <- variances[2, 'vcov']
+      }, error = function(err) {
+        message("lmer failed...")
+      })
+      if (!is.null(estimEnvVar)) {
+        estimHe <- NULL
+      }
+      
       
       BOSimSetup <- setupSimulation3(dataFile = phasedVcfFile,
                                      lchrCm = 100,
@@ -334,6 +341,7 @@ res <- mcmapply(function(x){
                                      currentPop = currentPop,
                                      mu = model$inter,
                                      ve = estimEnvVar,
+                                     he = estimHe,
                                      specName = "bayesOpt",
                                      popName = "initialPop",
                                      traitName = "trait1",
